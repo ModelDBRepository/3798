@@ -1,0 +1,162 @@
+celsius = 20
+
+nnode = 12
+ndemyl = 20
+
+create N[nnode], Ip[nnode-1], I[nnode-1], Id[nnode-1], D[ndemyl]
+access N[0]
+objref nsl, isl, dsl, allinter
+
+proc topol() {local i
+	// connect as though no demyelination
+	for i=0, nnode-2 {
+		N[i] connect Ip[i](0), 1
+		Ip[i] connect I[i](0), 1
+		I[i] connect Id[i](0), 1
+		Id[i] connect N[i+1](0), 1
+	}
+	// disconnect internode[5] (equivalent to 6 in the paper)
+	// and put in the D regions
+	Ip[5] disconnect()
+	N[6] disconnect()
+	N[5] connect D[0](0), 1
+	for i=1, ndemyl-1 {
+		D[i-1] connect D[i](0), 1
+	}
+	D[ndemyl-1] connect N[6](0), 1
+
+	// helper section lists
+	nsl = new SectionList()  isl = new SectionList()  dsl = new SectionList()
+	allinter = new SectionList()
+	forsec "N" {nsl.append}
+	forsec "I" {isl.append}
+	forsec "D" {dsl.append}
+	forsec nsl { nseg = 1 }
+	forsec isl { allinter.append }
+	forsec dsl { allinter.append }
+	for i=0, nnode-2 {
+		Ip[i].nseg = 1
+		I[i].nseg = 10
+		Id[i].nseg = 1
+	}
+	forsec dsl { nseg = 5 }
+}
+topol()
+
+proc insrt() {
+	forall {
+		insert fh
+		insert extracellular
+		Ra = 110
+		ki = 120
+		ko = 2.5
+		nai = 13.74
+		nao = 114.5
+	}
+}
+insrt()
+
+//geometrical properties
+objref axondiam, nlam, myldiam, interlen
+axondiam = new Vector()
+nlam = new Vector()
+myldiam = new Vector()
+interlen = new Vector()
+axondiam.append(19,16,14,11,8,5) // um
+nlam.append(150,150,150,150,111,134)
+myldiam.append(23.3, 20.3, 18.3, 15.3, 11.2, 8.8) // um
+interlen.append(2.13, 1.86, 1.67, 1.40, 1.02, 0.80) // mm
+
+// factor for xg and xcm
+func mylfac() {local d2, d1, nmyl
+	d1 = axondiam.x[$1]
+	d2 = myldiam.x[$1]
+	nmyl = 2*nlam.x[$1]
+	return (d2 - d1)/d1/log(d2/d1) / nmyl
+}
+	
+
+Gx = .0025
+Cx = 1
+
+proc geom() { local i
+	// arg is the geometrical property index
+	forall diam = axondiam.x[$1]
+	forsec nsl L = 2.5
+	forsec isl L = interlen.x[$1]*1e3
+	forsec dsl L = interlen.x[$1]/ndemyl*1e3
+	pl = 10
+	for i=0, nnode-2 {
+		Ip[i].L = pl
+		I[i].L -= 2*pl
+		Id[i].L = pl
+	}
+	mfac = mylfac($1)
+	ro = 80 //Ohm-cm
+	fhspace = 200 // Angstroms
+	Rfh = ro/PI/axondiam.x[$1]/fhspace *(1e6)
+	forsec allinter { xg = Gx*mfac  xc = Cx*mfac  xraxial = Rfh }
+	for i=0, nnode-2 { // perinodal junction has very high resistance
+		Ip[i].xraxial = 1e6/(Ip[i].L*(1e-4))
+		Id[i].xraxial = 1e6/(Ip[i].L*(1e-4))
+	}
+	unmyl()
+}
+
+proc unmyl() {
+	forsec dsl { xg = 1e6 }
+}
+
+proc demyl1() {local i, fac
+	unmyl()
+	for (i=$1; i < $2+1; i += 2) D[i] {
+		xg = Gx/2 // two membranes
+		xc = Cx/2
+	}
+}
+
+geom(1)
+
+PNabar = 8e-3
+PKbar = 1.2e-3
+PPbar = 0.54e-3
+nGm = 0.0303
+iGm = .0005
+
+proc inter_fhdens() { local fac
+	fac = $1/PNabar
+	forsec allinter {
+		pnabar_fh = fac*PNabar
+		pkbar_fh = 2*fac*PKbar
+		ppbar_fh = 2*fac*PPbar
+		gl_fh = iGm
+	}
+}
+
+proc nodal_fhdens() {
+	forsec nsl {
+		pnabar_fh = PNabar
+		pkbar_fh = PKbar
+		ppbar_fh = PPbar
+		gl_fh = nGm
+	}
+}
+
+proc memb() {
+	forsec nsl { cm = 2 }
+	forsec isl { cm = 1 }
+	forsec dsl { cm = 1 }
+	inter_fhdens(0.4e-3)
+	nodal_fhdens()
+}
+
+memb()
+
+proc init() {
+	finitialize(v_init)
+	fcurrent()
+	forall {
+		//0 = ina + ik + ip_fh + gl_fh*(v - el_fh)
+		el_fh = (ina + ik + ip_fh)/gl_fh + v
+	}
+}

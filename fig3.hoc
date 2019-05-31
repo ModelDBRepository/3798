@@ -1,0 +1,14 @@
+load_file("nrngui.hoc")
+load_file("axon.hoc")
+load_file("fig3.ses")
+tstop = 6
+dt = .005
+
+/* inside fig3.ses
+xpanel("Figure 3")
+xbutton("A", "inter_fhdens(0.4e-3) unmyl() run()")
+xbutton("B", "inter_fhdens(0.5e-3) unmyl() run()")
+xbutton("C", "inter_fhdens(0.4e-3) demyl1(1,3) run()")
+xbutton("D", "inter_fhdens(0.4e-3) demyl1(1,19) run()")
+xpanel()
+*/

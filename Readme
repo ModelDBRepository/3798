@@ -1,0 +1,12 @@
+Hines, Michael and Peter Shrager (1991). A computational test of
+the requirements for conduction in demyelinated axons.
+J. Restorative Neurology and Neuroscience. 3 81--93.
+
+This example produces figure 3 of the paper.  The implementation is
+derived from the paper and is not based on the original code. 
+Discrepancies in minor quantitative details are those that depend on a
+few tenths of a degC changes in celsius.  The current version of NEURON
+(v5.2) does not allow use of secondorder=2 in the presence of the
+extracellular mechanism.
+
+
